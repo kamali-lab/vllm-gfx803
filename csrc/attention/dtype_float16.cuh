@@ -158,13 +158,19 @@ inline __device__ uint16_t add(uint16_t a, uint16_t b) {
 }
 
 inline __device__ uint32_t add(uint32_t a, uint32_t b) {
-  uint32_t c;
-#ifndef USE_ROCM
-  asm volatile("add.f16x2 %0, %1, %2;\n" : "=r"(c) : "r"(a), "r"(b));
+#if defined(__gfx803__)
+  // GCN 4.0 fallback using standard HIP types
+  __half2 a_h2 = reinterpret_cast<__half2&>(a);
+  __half2 b_h2 = reinterpret_cast<__half2&>(b);
+  a_h2.x += b_h2.x;
+  a_h2.y += b_h2.y;
+  return reinterpret_cast<uint32_t&>(a_h2);
 #else
+  // GCN 5.0+ (Vega and newer) use packed instructions
+  uint32_t c;
   asm volatile("v_pk_add_f16 %0, %1, %2;\n" : "=v"(c) : "v"(a), "v"(b));
-#endif
   return c;
+#endif
 }
 
 inline __device__ uint2 add(uint2 a, uint2 b) {
@@ -218,13 +224,19 @@ inline __device__ uint16_t mul(uint16_t a, uint16_t b) {
 
 template <>
 inline __device__ uint32_t mul(uint32_t a, uint32_t b) {
-  uint32_t c;
-#ifndef USE_ROCM
-  asm volatile("mul.f16x2 %0, %1, %2;\n" : "=r"(c) : "r"(a), "r"(b));
+#if defined(__gfx803__)
+  // GCN 4.0 fallback using standard HIP types
+  __half2 a_h2 = reinterpret_cast<__half2&>(a);
+  __half2 b_h2 = reinterpret_cast<__half2&>(b);
+  a_h2.x *= b_h2.x;
+  a_h2.y *= b_h2.y;
+  return reinterpret_cast<uint32_t&>(a_h2);
 #else
+  // GCN 5.0+ (Vega and newer) use packed instructions
+  uint32_t c;
   asm volatile("v_pk_mul_f16 %0, %1, %2;\n" : "=v"(c) : "v"(a), "v"(b));
-#endif
   return c;
+#endif
 }
 
 template <>
@@ -329,17 +341,22 @@ inline __device__ Float8_ mul(uint16_t a, uint4 b) {
 
 // Vector fused multiply-add.
 inline __device__ uint32_t fma(uint32_t a, uint32_t b, uint32_t c) {
-  uint32_t d;
-#ifndef USE_ROCM
-  asm volatile("fma.rn.f16x2 %0, %1, %2, %3;\n"
-               : "=r"(d)
-               : "r"(a), "r"(b), "r"(c));
+#if defined(__gfx803__)
+  // GCN 4.0 fallback using standard HIP types
+  __half2 a_h2 = reinterpret_cast<__half2&>(a);
+  __half2 b_h2 = reinterpret_cast<__half2&>(b);
+  __half2 c_h2 = reinterpret_cast<__half2&>(c);
+  c_h2.x = (a_h2.x * b_h2.x) + c_h2.x;
+  c_h2.y = (a_h2.y * b_h2.y) + c_h2.y;
+  return reinterpret_cast<uint32_t&>(c_h2);
 #else
+  // GCN 5.0+ (Vega and newer) use packed instructions
+  uint32_t d;
   asm volatile("v_pk_fma_f16 %0, %1, %2, %3;\n"
                : "=v"(d)
                : "v"(a), "v"(b), "v"(c));
-#endif
   return d;
+#endif
 }
 
 inline __device__ uint32_t fma(uint16_t a, uint32_t b, uint32_t c) {
