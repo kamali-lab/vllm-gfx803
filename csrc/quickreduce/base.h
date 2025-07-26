@@ -108,6 +108,14 @@ __quickreduce_device_inline__ void packed_assign_add(int32x4_t* A,
 template <>
 __quickreduce_device_inline__ void packed_assign_add<half>(int32x4_t* A,
                                                            int32x4_t* B) {
+#if defined(__gfx803__)
+  __half2* a_ptr = reinterpret_cast<__half2*>(A);
+  __half2* b_ptr = reinterpret_cast<__half2*>(B);
+  for (int i = 0; i < 4; i++) {
+    a_ptr[i].x += b_ptr[i].x;
+    a_ptr[i].y += b_ptr[i].y;
+  }
+#else
   int32x4_t& tR_fragment = A[0];
   int32x4_t& tA_fragment = B[0];
 
@@ -123,6 +131,7 @@ __quickreduce_device_inline__ void packed_assign_add<half>(int32x4_t* A,
   asm volatile("v_pk_add_f16 %0, %1, %2"
                : "=v"(tR_fragment[3])
                : "v"(tR_fragment[3]), "v"(tA_fragment[3]));
+#endif
 }
 
 template <>
@@ -142,7 +151,15 @@ __quickreduce_device_inline__ int packed_max(int a, int b);
 template <>
 __quickreduce_device_inline__ int packed_max<half>(int a, int b) {
   int result;
+#if defined(__gfx803__)
+  __half2 a_h2 = reinterpret_cast<__half2&>(a);
+  __half2 b_h2 = reinterpret_cast<__half2&>(b);
+  a_h2.x = __hmax(a_h2.x, b_h2.x);
+  a_h2.y = __hmax(a_h2.y, b_h2.y);
+  result = reinterpret_cast<int&>(a_h2);
+#else
   asm volatile("v_pk_max_f16 %0, %1, %2" : "=v"(result) : "v"(a), "v"(b));
+#endif
   return result;
 }
 
@@ -161,7 +178,15 @@ __quickreduce_device_inline__ int packed_min(int a, int b);
 template <>
 __quickreduce_device_inline__ int packed_min<half>(int a, int b) {
   int result;
+#if defined(__gfx803__)
+  __half2 a_h2 = reinterpret_cast<__half2&>(a);
+  __half2 b_h2 = reinterpret_cast<__half2&>(b);
+  a_h2.x = __hmin(a_h2.x, b_h2.x);
+  a_h2.y = __hmin(a_h2.y, b_h2.y);
+  result = reinterpret_cast<int&>(a_h2);
+#else
   asm volatile("v_pk_min_f16 %0, %1, %2" : "=v"(result) : "v"(a), "v"(b));
+#endif
   return result;
 }
 
@@ -206,7 +231,15 @@ __quickreduce_device_inline__ int packed_add(int a, int b);
 template <>
 __quickreduce_device_inline__ int packed_add<half>(int a, int b) {
   int result;
+#if defined(__gfx803__)
+  __half2 a_h2 = reinterpret_cast<__half2&>(a);
+  __half2 b_h2 = reinterpret_cast<__half2&>(b);
+  a_h2.x += b_h2.x;
+  a_h2.y += b_h2.y;
+  result = reinterpret_cast<int&>(a_h2);
+#else
   asm volatile("v_pk_add_f16 %0, %1, %2" : "=v"(result) : "v"(a), "v"(b));
+#endif
   return result;
 }
 
@@ -222,7 +255,17 @@ __quickreduce_device_inline__ int packed_add<nv_bfloat16>(int a, int b) {
 template <>
 __quickreduce_device_inline__ int packed_add<int16_t>(int a, int b) {
   int result;
+#if defined(__gfx803__)
+  int16_t a_lo = a & 0xFFFF;
+  int16_t a_hi = a >> 16;
+  int16_t b_lo = b & 0xFFFF;
+  int16_t b_hi = b >> 16;
+  int16_t c_lo = a_lo + b_lo;
+  int16_t c_hi = a_hi + b_hi;
+  result = (static_cast<int>(c_hi) << 16) | (static_cast<int>(c_lo) & 0xFFFF);
+#else
   asm volatile("v_pk_add_i16 %0, %1, %2" : "=v"(result) : "v"(a), "v"(b));
+#endif
   return result;
 }
 
@@ -232,11 +275,18 @@ __quickreduce_device_inline__ int packed_sub(int a, int b);
 template <>
 __quickreduce_device_inline__ int packed_sub<half>(int a, int b) {
   int result;
-
+#if defined(__gfx803__)
+  __half2 a_h2 = reinterpret_cast<__half2&>(a);
+  __half2 b_h2 = reinterpret_cast<__half2&>(b);
+  a_h2.x -= b_h2.x;
+  a_h2.y -= b_h2.y;
+  result = reinterpret_cast<int&>(a_h2);
+#else
   // MI300 lacks packed fp16 sub instruction. So we do -1 * min + max
-  asm volatile("v_pk_fma_f16 %0, %1, %2 %3"
+  asm volatile("v_pk_fma_f16 %0, %1, %2, %3"
                : "=v"(result)
                : "v"(kNegOne), "v"(b), "v"(a));
+#endif
   return result;
 }
 
@@ -255,7 +305,15 @@ __quickreduce_device_inline__ int packed_mul(int a, int b);
 template <>
 __quickreduce_device_inline__ int packed_mul<half>(int a, int b) {
   int result;
+#if defined(__gfx803__)
+  __half2 a_h2 = reinterpret_cast<__half2&>(a);
+  __half2 b_h2 = reinterpret_cast<__half2&>(b);
+  a_h2.x *= b_h2.x;
+  a_h2.y *= b_h2.y;
+  result = reinterpret_cast<int&>(a_h2);
+#else
   asm volatile("v_pk_mul_f16 %0, %1, %2" : "=v"(result) : "v"(a), "v"(b));
+#endif
   return result;
 }
 
