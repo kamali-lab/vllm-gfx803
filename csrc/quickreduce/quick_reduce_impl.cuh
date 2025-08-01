@@ -355,9 +355,7 @@ struct CodecQ6 : public CodecBase {
           q2w >>= 4;
           if constexpr (std::is_same<T, half>::value) {
             int32_t q6 = q4 | (q2 << 4) | kHalf2_1024;
-            asm volatile("v_pk_add_f16 %0, %1, %2"
-                         : "=v"(w[i])
-                         : "v"(q6), "v"(kHalf2_1056));
+            w[i] = packed_add<half>(q6, kHalf2_1056);
           } else {
             int32_t int16_2 = q4 | (q2 << 4);
             int16_t low = static_cast<int16_t>(int16_2 & 0xFFFF);
